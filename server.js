@@ -1,4 +1,9 @@
 import express from 'express';
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+import { Task } from './models/Task.js';
+
+dotenv.config();
 
 const app = express();
 app.use(express.json());
@@ -17,60 +22,93 @@ app.use((req, res, next) => {
   next();
 });
 
-// In-memory storage
-let tasks = [];
-let nextId = 1;
+// MongoDB Connection
+async function connectDB() {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI);
+    console.log('MongoDB connected successfully');
+  } catch (err) {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
+  }
+}
 
-// Route-specific middleware: validate task id parameter
+// Route-specific middleware: validate task id parameter (MongoDB ObjectId)
 function validateId(req, res, next) {
-  const id = Number(req.params.id);
-  if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ error: 'Invalid id' });
-  req.taskId = id;
+  if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+    return res.status(400).json({ error: 'Invalid id' });
+  }
+  req.taskId = req.params.id;
   next();
 }
 
 const router = express.Router();
 
 // GET /tasks -> return all tasks
-router.get('/tasks', (req, res) => {
-  res.json({ tasks });
-});
-
-// POST /tasks -> create a task
-router.post('/tasks', (req, res, next) => {
+router.get('/tasks', async (req, res, next) => {
   try {
-    const { title, description } = req.body;
-    if (!title) return res.status(400).json({ error: 'Title is required' });
-    const task = { id: nextId++, title, description: description || '', completed: false };
-    tasks.push(task);
-    res.status(201).json({ task });
+    const tasks = await Task.find();
+    res.json({ tasks });
   } catch (err) {
     next(err);
   }
 });
 
-// PUT /tasks/:id -> update a task
-router.put('/tasks/:id', validateId, (req, res, next) => {
+// GET /task/:id -> return a single task by id
+router.get('/task/:id', validateId, async (req, res, next) => {
   try {
-    const task = tasks.find((t) => t.id === req.taskId);
+    const task = await Task.findById(req.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
-    const { title, description, completed } = req.body;
-    if (title !== undefined) task.title = title;
-    if (description !== undefined) task.description = description;
-    if (completed !== undefined) task.completed = !!completed;
     res.json({ task });
   } catch (err) {
     next(err);
   }
 });
 
-// DELETE /tasks/:id -> delete a task
-router.delete('/tasks/:id', validateId, (req, res, next) => {
+// POST /tasks -> create a task
+router.post('/tasks', async (req, res, next) => {
   try {
-    const idx = tasks.findIndex((t) => t.id === req.taskId);
-    if (idx === -1) return res.status(404).json({ error: 'Task not found' });
-    const [deleted] = tasks.splice(idx, 1);
-    res.json({ deleted });
+    const { title, description, priority } = req.body;
+    if (!title) return res.status(400).json({ error: 'Title is required' });
+    const task = new Task({ title, description: description || '', priority: priority || 'medium' });
+    await task.save();
+    res.status(201).json({ task });
+  } catch (err) {
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ error: messages.join(', ') });
+    }
+    next(err);
+  }
+});
+
+// PUT /tasks/:id -> update a task
+router.put('/tasks/:id', validateId, async (req, res, next) => {
+  try {
+    const task = await Task.findById(req.taskId);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    const { title, description, completed, priority } = req.body;
+    if (title !== undefined) task.title = title;
+    if (description !== undefined) task.description = description;
+    if (completed !== undefined) task.completed = !!completed;
+    if (priority !== undefined) task.priority = priority;
+    await task.save();
+    res.json({ task });
+  } catch (err) {
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors).map(e => e.message);
+      return res.status(400).json({ error: messages.join(', ') });
+    }
+    next(err);
+  }
+});
+
+// DELETE /tasks/:id -> delete a task
+router.delete('/tasks/:id', validateId, async (req, res, next) => {
+  try {
+    const task = await Task.findByIdAndDelete(req.taskId);
+    if (!task) return res.status(404).json({ error: 'Task not found' });
+    res.json({ deleted: task });
   } catch (err) {
     next(err);
   }
@@ -90,4 +128,8 @@ app.use((err, req, res, _next) => {
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+// Start server after connecting to MongoDB
+connectDB().then(() => {
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+});
