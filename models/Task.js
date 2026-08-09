@@ -27,14 +27,13 @@ const taskSchema = new mongoose.Schema({
 });
 
 // Pre-save hook to trim whitespace
-taskSchema.pre('save', function(next) {
+taskSchema.pre('save', async function() {
   if (this.title) {
     this.title = this.title.trim();
   }
   if (this.description) {
     this.description = this.description.trim();
   }
-  next();
 });
 
 export const Task = mongoose.model('Task', taskSchema);
