@@ -2,28 +2,84 @@ import { useEffect, useMemo, useState, useCallback } from 'react'
 import ErrorMessage from './ErrorMessage.jsx'
 import Spinner from './Spinner.jsx'
 import Toasts from './Toast.jsx'
-import { getTasks, createTask, updateTask, deleteTask } from '../api.js'
+import {
+  getTasks,
+  createTask,
+  updateTask,
+  deleteTask,
+  getCurrentUser,
+  loginUser,
+  registerUser,
+  clearAuthToken,
+  getAuthToken,
+} from '../api.js'
 
 function Projects() {
+  const token = getAuthToken()
   const [tasks, setTasks] = useState([])
-  const [loading, setLoading] = useState(true) // initial load
+  const [loading, setLoading] = useState(Boolean(token))
   const [createLoading, setCreateLoading] = useState(false)
-  const [actionLoading, setActionLoading] = useState({}) // { [id]: { updating: bool, deleting: bool } }
+  const [actionLoading, setActionLoading] = useState({})
   const [error, setError] = useState(null)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [retryCount, setRetryCount] = useState(0)
   const [toasts, setToasts] = useState([])
+  const [authMode, setAuthMode] = useState('login')
+  const [authForm, setAuthForm] = useState({ email: '', password: '' })
+  const [authError, setAuthError] = useState(null)
+  const [authLoading, setAuthLoading] = useState(false)
+  const [user, setUser] = useState(null)
 
-  // toast helpers
   const pushToast = useCallback((message, type = 'info') => {
-    const id = `t_${Date.now()}_${Math.random().toString(36).slice(2,7)}`
+    const id = `t_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
     setToasts((s) => [...s, { id, message, type }])
     return id
   }, [])
+
   const removeToast = useCallback((id) => setToasts((s) => s.filter((t) => t.id !== id)), [])
 
   useEffect(() => {
+    if (!token) {
+      setUser(null)
+      setTasks([])
+      setLoading(false)
+      return
+    }
+
+    let active = true
+    const controller = new AbortController()
+
+    const loadCurrentUser = async () => {
+      setLoading(true)
+      setError(null)
+      try {
+        const currentUser = await getCurrentUser(controller.signal)
+        if (!active) return
+        setUser(currentUser)
+      } catch (err) {
+        if (!active) return
+        setUser(null)
+        clearAuthToken()
+        setAuthError(err.message)
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+
+    loadCurrentUser()
+    return () => {
+      active = false
+      controller.abort()
+    }
+  }, [token])
+
+  useEffect(() => {
+    if (!token || !user) {
+      if (!token) setTasks([])
+      return
+    }
+
     const controller = new AbortController()
 
     const loadTasks = async () => {
@@ -44,9 +100,46 @@ function Projects() {
 
     loadTasks()
     return () => controller.abort()
-  }, [retryCount, pushToast])
+  }, [retryCount, token, user, pushToast])
 
-  // Optimistic create: show task in list immediately with temp id, replace on success, remove on failure
+  const handleAuthSubmit = async (event) => {
+    event.preventDefault()
+    const email = authForm.email.trim().toLowerCase()
+    const password = authForm.password
+
+    if (!email || !password) {
+      setAuthError('Email and password are required')
+      return
+    }
+
+    setAuthError(null)
+    setAuthLoading(true)
+
+    try {
+      const payload = { email, password }
+      const result = authMode === 'login' ? await loginUser(payload) : await registerUser(payload)
+      setUser(result.user)
+      setAuthForm({ email: '', password: '' })
+      setAuthMode('login')
+      pushToast(authMode === 'login' ? 'Logged in successfully' : 'Registration successful', 'success')
+    } catch (err) {
+      setAuthError(err.message)
+      pushToast(`Authentication failed: ${err.message}`, 'error')
+    } finally {
+      setAuthLoading(false)
+    }
+  }
+
+  const handleLogout = () => {
+    clearAuthToken()
+    setUser(null)
+    setTasks([])
+    setError(null)
+    setAuthError(null)
+    setAuthForm({ email: '', password: '' })
+    pushToast('Logged out successfully', 'info')
+  }
+
   const handleCreate = async (e) => {
     e.preventDefault()
     if (!title.trim()) return setError('Title is required')
@@ -61,7 +154,6 @@ function Projects() {
       optimistic: true,
     }
 
-    // optimistic insert
     setTasks((prev) => [optimisticTask, ...prev])
     setTitle('')
     setDescription('')
@@ -69,11 +161,9 @@ function Projects() {
 
     try {
       const saved = await createTask({ title: optimisticTask.title, description: optimisticTask.description })
-      // replace temp item with saved item
       setTasks((prev) => prev.map((t) => (t._id === tempId ? saved : t)))
       pushToast('Task created', 'success')
     } catch (err) {
-      // remove temp item
       setTasks((prev) => prev.filter((t) => t._id !== tempId))
       setError(err.message)
       pushToast(`Create failed: ${err.message}`, 'error')
@@ -119,6 +209,51 @@ function Projects() {
 
   const filtered = useMemo(() => tasks, [tasks])
 
+  if (!token) {
+    return (
+      <section className="portfolio-section projects-section">
+        <h2>Authentication</h2>
+        <Toasts toasts={toasts} removeToast={removeToast} />
+        {authError && <ErrorMessage message={authError} />}
+
+        <div className="task-form" style={{ marginTop: '1rem' }}>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+            <button type="button" onClick={() => setAuthMode('login')} disabled={authMode === 'login'}>
+              Login
+            </button>
+            <button type="button" onClick={() => setAuthMode('register')} disabled={authMode === 'register'}>
+              Register
+            </button>
+          </div>
+
+          <form onSubmit={handleAuthSubmit}>
+            <label htmlFor="auth-email">Email</label>
+            <input
+              id="auth-email"
+              type="email"
+              value={authForm.email}
+              onChange={(e) => setAuthForm((prev) => ({ ...prev, email: e.target.value }))}
+              disabled={authLoading}
+            />
+
+            <label htmlFor="auth-password">Password</label>
+            <input
+              id="auth-password"
+              type="password"
+              value={authForm.password}
+              onChange={(e) => setAuthForm((prev) => ({ ...prev, password: e.target.value }))}
+              disabled={authLoading}
+            />
+
+            <button type="submit" disabled={authLoading}>
+              {authLoading ? (authMode === 'login' ? 'Logging in…' : 'Registering…') : authMode === 'login' ? 'Login' : 'Register'}
+            </button>
+          </form>
+        </div>
+      </section>
+    )
+  }
+
   if (loading) {
     return (
       <section className="portfolio-section projects-section">
@@ -130,11 +265,18 @@ function Projects() {
 
   return (
     <section className="portfolio-section projects-section">
-      <h2>Tasks</h2>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem' }}>
+        <h2>Tasks</h2>
+        <button type="button" onClick={handleLogout} className="danger">Logout</button>
+      </div>
 
       <Toasts toasts={toasts} removeToast={removeToast} />
 
       {error && <ErrorMessage message={error} />}
+
+      <p style={{ marginBottom: '0.5rem' }}>
+        Logged in as <strong>{user?.email || 'user'}</strong>
+      </p>
 
       <form className="task-form" onSubmit={handleCreate}>
         <label htmlFor="task-title">Title</label>
@@ -165,7 +307,7 @@ function Projects() {
                 <div className="task-content">
                   <strong>{task.title}</strong>
                   {task.description && <div className="task-desc">{task.description}</div>}
-                  {task.optimistic && <div style={{fontSize:12, color:'#888'}}>Saving…</div>}
+                  {task.optimistic && <div style={{ fontSize: 12, color: '#888' }}>Saving…</div>}
                 </div>
               </div>
               <div className="task-actions">
