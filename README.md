@@ -98,3 +98,23 @@ npm run start    # Start Express server (Practical 5)
 npm run lint
 npm run build
 ```
+
+## Practical 8 Features (Lazy Loading and Code Splitting)
+
+- Route-based code splitting added with `React.lazy()` and `Suspense`.
+- `Projects` and `Contact` now load only when their routes are visited.
+- A dedicated fallback UI appears while each route chunk downloads.
+- Use Vite build output and browser DevTools Network tab to compare:
+  - initial bundle size
+  - per-route chunk files
+  - page load behavior before and after optimization
+
+### Performance Notes
+
+| Metric | Before | After |
+| --- | --- | --- |
+| Initial JS bundle | Capture from baseline build | Capture after lazy loading |
+| Route chunk loading | Not split | Split into route-specific chunks |
+| Route transition UX | Immediate bundle cost upfront | Fallback shown while chunk loads |
+
+> Add your screenshots or recorded DevTools values here for submission evidence.

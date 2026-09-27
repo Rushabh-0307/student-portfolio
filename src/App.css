@@ -100,6 +100,37 @@
   gap: 1rem;
 }
 
+.route-fallback {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1rem;
+  background-color: #f8fafc;
+  min-height: 160px;
+  display: grid;
+  align-content: center;
+  gap: 0.35rem;
+  text-align: center;
+}
+
+.theme-dark .route-fallback {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+.route-fallback-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.route-fallback-text {
+  margin: 0;
+  color: #475569;
+}
+
+.theme-dark .route-fallback-text {
+  color: #cbd5e1;
+}
+
 .route-content {
   display: grid;
   gap: 1rem;

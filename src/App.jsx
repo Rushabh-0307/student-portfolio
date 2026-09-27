@@ -1,13 +1,23 @@
-import { useState } from 'react'
+import { lazy, Suspense, useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
-import Contact from './components/Contact.jsx'
 import Footer from './components/Footer.jsx'
 import Header from './components/Header.jsx'
 import Home from './components/Home.jsx'
 import NavBar from './components/NavBar.jsx'
 import NotFound from './components/NotFound.jsx'
-import Projects from './components/Projects.jsx'
 import './App.css'
+
+const Projects = lazy(() => import('./components/Projects.jsx'))
+const Contact = lazy(() => import('./components/Contact.jsx'))
+
+function RouteFallback() {
+  return (
+    <div className="route-fallback" role="status" aria-live="polite">
+      <p className="route-fallback-title">Loading page...</p>
+      <p className="route-fallback-text">Fetching the route chunk for this section.</p>
+    </div>
+  )
+}
 
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(false)
@@ -30,20 +40,22 @@ function App() {
       />
       <Header title="Student Portfolio" name="Rushabh" themeColor="#1d4ed8" />
       <main className="portfolio-page">
-        <Routes>
-          <Route
-            path="/"
-            element={
-              <Home
-                bio="I am a B.Tech student focused on building clean, responsive web applications using modern frontend tools."
-                skillList={skillList}
-              />
-            }
-          />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense fallback={<RouteFallback />}>
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <Home
+                  bio="I am a B.Tech student focused on building clean, responsive web applications using modern frontend tools."
+                  skillList={skillList}
+                />
+              }
+            />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </main>
       <Footer email="rushabh.student@example.com" />
     </div>
