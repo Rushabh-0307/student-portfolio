@@ -118,3 +118,29 @@ npm run build
 | Route transition UX | Immediate bundle cost upfront | Fallback shown while chunk loads |
 
 > Add your screenshots or recorded DevTools values here for submission evidence.
+
+## Practical 9 Features (In-Memory Caching and Query Optimization)
+
+- Added in-memory caching for authenticated task routes using `node-cache`.
+- `GET /tasks` now serves from cache for repeated reads within the TTL window.
+- `GET /task/:id` is cached separately from the all-tasks response.
+- Cache entries are invalidated after successful `POST`, `PUT`, and `DELETE` operations.
+- A protected debug endpoint is available at `GET /cache-stats` for cache-hit/cache-miss counts.
+- `X-Cache: HIT` / `X-Cache: MISS` headers are returned on cached GET responses.
+
+### Response Time Comparison Log
+
+Record at least 3 samples for each case in Postman or Thunder Client.
+
+| Case | Sample 1 | Sample 2 | Sample 3 | Notes |
+| --- | --- | --- | --- | --- |
+| Uncached `GET /tasks` |  |  |  | Cache check temporarily disabled |
+| Cached `GET /tasks` |  |  |  | Repeated request within TTL |
+| Uncached `GET /task/:id` |  |  |  | Optional extra comparison |
+| Cached `GET /task/:id` |  |  |  | Optional extra comparison |
+
+### Notes
+
+- `node-cache` is process-local and resets on restart.
+- TTL is set to 60 seconds for lab testing.
+- Cache invalidation is required on every write so stale task data is not served.

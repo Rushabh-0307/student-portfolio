@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { getCacheStats, getCachedValue, invalidateCache, setCachedValue } from './cache.js';
 import { Task } from './models/Task.js';
 import { User } from './models/User.js';
 
@@ -92,6 +93,16 @@ function validateTaskPayload(req, res, next) {
   next();
 }
 
+const ALL_TASKS_CACHE_KEY = 'tasks:all';
+
+function taskCacheKey(taskId) {
+  return `tasks:${taskId}`;
+}
+
+function clearTaskCaches(taskId) {
+  invalidateCache([ALL_TASKS_CACHE_KEY, taskCacheKey(taskId)]);
+}
+
 const router = express.Router();
 
 router.post('/register', async (req, res, next) => {
@@ -176,7 +187,15 @@ router.use(protect);
 
 router.get('/tasks', async (req, res, next) => {
   try {
-    const tasks = await Task.find();
+    const cachedTasks = getCachedValue(ALL_TASKS_CACHE_KEY);
+    if (cachedTasks) {
+      res.set('X-Cache', 'HIT');
+      return res.json({ tasks: cachedTasks });
+    }
+
+    const tasks = await Task.find().lean();
+    setCachedValue(ALL_TASKS_CACHE_KEY, tasks);
+    res.set('X-Cache', 'MISS');
     res.json({ tasks });
   } catch (err) {
     next(err);
@@ -185,8 +204,17 @@ router.get('/tasks', async (req, res, next) => {
 
 router.get('/task/:id', validateId, async (req, res, next) => {
   try {
-    const task = await Task.findById(req.taskId);
+    const cacheKey = taskCacheKey(req.taskId);
+    const cachedTask = getCachedValue(cacheKey);
+    if (cachedTask) {
+      res.set('X-Cache', 'HIT');
+      return res.json({ task: cachedTask });
+    }
+
+    const task = await Task.findById(req.taskId).lean();
     if (!task) return res.status(404).json({ error: 'Task not found' });
+    setCachedValue(cacheKey, task);
+    res.set('X-Cache', 'MISS');
     res.json({ task });
   } catch (err) {
     next(err);
@@ -202,6 +230,7 @@ router.post('/tasks', validateTaskPayload, async (req, res, next) => {
       priority: priority || 'medium',
     });
     await task.save();
+    clearTaskCaches(task._id.toString());
     res.status(201).json({ task });
   } catch (err) {
     if (err.name === 'ValidationError') {
@@ -224,6 +253,7 @@ router.put('/tasks/:id', validateId, validateTaskPayload, async (req, res, next)
     if (priority !== undefined) task.priority = priority;
 
     await task.save();
+    clearTaskCaches(task._id.toString());
     res.json({ task });
   } catch (err) {
     if (err.name === 'ValidationError') {
@@ -234,10 +264,15 @@ router.put('/tasks/:id', validateId, validateTaskPayload, async (req, res, next)
   }
 });
 
+router.get('/cache-stats', (_req, res) => {
+  res.json(getCacheStats());
+});
+
 router.delete('/tasks/:id', validateId, async (req, res, next) => {
   try {
     const task = await Task.findByIdAndDelete(req.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
+    clearTaskCaches(req.taskId);
     res.json({ deleted: task });
   } catch (err) {
     next(err);
