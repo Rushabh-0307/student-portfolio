@@ -145,6 +145,48 @@ Record at least 3 samples for each case in Postman or Thunder Client.
 - TTL is set to 60 seconds for lab testing.
 - Cache invalidation is required on every write so stale task data is not served.
 
+## Practical 11 Features (Docker Containerization)
+
+The full-stack application can be built and started with one Docker Compose command:
+
+```bash
+docker compose up --build
+```
+
+This starts three services on the `app-network` bridge network:
+
+| Service | Container port | Host port | Purpose |
+| --- | ---: | ---: | --- |
+| `frontend` | 5173 | 5173 | Builds and serves the React application |
+| `backend` | 5000 | 5000 | Runs the Node/Express API |
+| `mongodb` | 27017 | 27017 | Stores task data |
+
+Open `http://localhost:5173` after the containers start. The browser uses the
+published backend address at `http://localhost:5000`; inside the Compose
+network, the backend connects to MongoDB using the service name
+`mongodb://mongodb:27017/taskdb`, not `localhost`.
+
+The frontend uses a multi-stage build so the final image contains only the
+production preview server and the generated `dist` output. The root
+`.dockerignore` excludes `node_modules`, `.env`, local virtual environments,
+build output, and repository metadata from Docker build contexts.
+
+MongoDB data is stored in the named `mongodb-data` volume and survives
+container restarts. To stop the stack without deleting data:
+
+```bash
+docker compose down
+```
+
+To remove the containers and the persisted database volume:
+
+```bash
+docker compose down -v
+```
+
+If port `5000`, `5173`, or `27017` is already in use, change the host side of
+the corresponding `ports` entry in `docker-compose.yml`.
+
 ## Practical 10 Features (Event-Driven Async Processing)
 
 - Added a native Node.js `EventEmitter` in [events.js](./events.js) for task lifecycle events.

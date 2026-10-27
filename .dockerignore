@@ -1,0 +1,9 @@
+node_modules
+.env
+.venv
+dist
+.git
+.gitignore
+*.log
+2.pdf
+3.pdf
