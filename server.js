@@ -5,8 +5,10 @@ import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { getCacheStats, getCachedValue, invalidateCache, setCachedValue } from './cache.js';
+import taskEvents from './events.js';
 import { Task } from './models/Task.js';
 import { User } from './models/User.js';
+import './listeners.js';
 
 dotenv.config();
 
@@ -232,6 +234,11 @@ router.post('/tasks', validateTaskPayload, async (req, res, next) => {
     await task.save();
     clearTaskCaches(task._id.toString());
     res.status(201).json({ task });
+    console.log(`[API] Response sent at ${new Date().toISOString()} for task "${task.title}"`);
+    taskEvents.emit('task-created', {
+      task: task.toObject(),
+      assignedUser: req.user.email || req.user.id,
+    });
   } catch (err) {
     if (err.name === 'ValidationError') {
       const messages = Object.values(err.errors).map((e) => e.message);
@@ -274,6 +281,11 @@ router.delete('/tasks/:id', validateId, async (req, res, next) => {
     if (!task) return res.status(404).json({ error: 'Task not found' });
     clearTaskCaches(req.taskId);
     res.json({ deleted: task });
+    console.log(`[API] Response sent at ${new Date().toISOString()} for deleted task "${task.title}"`);
+    taskEvents.emit('task-deleted', {
+      task: task.toObject(),
+      assignedUser: req.user.email || req.user.id,
+    });
   } catch (err) {
     next(err);
   }

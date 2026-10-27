@@ -144,3 +144,26 @@ Record at least 3 samples for each case in Postman or Thunder Client.
 - `node-cache` is process-local and resets on restart.
 - TTL is set to 60 seconds for lab testing.
 - Cache invalidation is required on every write so stale task data is not served.
+
+## Practical 10 Features (Event-Driven Async Processing)
+
+- Added a native Node.js `EventEmitter` in [events.js](./events.js) for task lifecycle events.
+- `POST /tasks` emits `task-created` after the `201` response is sent.
+- The task-created listener simulates a two-second notification delay and logs:
+  - task title
+  - handler start and completion timestamps
+  - assigned user
+- `DELETE /tasks/:id` emits `task-deleted` after the response is sent.
+- An `error` listener logs rejected asynchronous event handlers without crashing the server.
+
+### Expected Console Evidence
+
+The API response log must appear before the delayed notification completion log:
+
+```text
+[API] Response sent at 2026-... for task "Prepare practical"
+[Notification] Task "Prepare practical" handler started at 2026-... (assigned user: ...)
+[Notification] Task "Prepare practical" notification completed at 2026-... (assigned user: ...)
+```
+
+The two-second delay is intentionally outside the request-response path. This demonstrates that the API can return immediately while the notification work continues on the event loop.
