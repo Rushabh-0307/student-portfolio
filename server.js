@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'node:crypto';
 import { getCacheStats, getCachedValue, invalidateCache, setCachedValue } from './cache.js';
 import taskEvents from './events.js';
 import { Task } from './models/Task.js';
@@ -14,6 +15,10 @@ dotenv.config();
 
 const app = express();
 const JWT_SECRET = process.env.JWT_SECRET || 'development-secret-change-me';
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const GITHUB_CALLBACK_URL = process.env.GITHUB_CALLBACK_URL || 'http://localhost:5000/auth/github/callback';
+const githubOAuthStates = new Map();
+const githubAuthCodes = new Map();
 
 app.use(cors());
 app.use(express.json());
@@ -50,6 +55,19 @@ function validateId(req, res, next) {
 
 function generateToken(user) {
   return jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: '1h' });
+}
+
+function createTemporaryValue(store, value) {
+  const key = crypto.randomBytes(32).toString('hex');
+  store.set(key, { value, expiresAt: Date.now() + 10 * 60 * 1000 });
+  return key;
+}
+
+function consumeTemporaryValue(store, key) {
+  const entry = store.get(key);
+  store.delete(key);
+  if (!entry || entry.expiresAt < Date.now()) return null;
+  return entry.value;
 }
 
 function protect(req, res, next) {
@@ -107,6 +125,90 @@ function clearTaskCaches(taskId) {
 
 const router = express.Router();
 
+app.get('/auth/github', (req, res) => {
+  if (!process.env.GITHUB_CLIENT_ID || !process.env.GITHUB_CLIENT_SECRET) {
+    return res.status(503).json({ error: 'GitHub authentication is not configured' });
+  }
+
+  const state = createTemporaryValue(githubOAuthStates, {
+    redirect: typeof req.query.redirect === 'string' && req.query.redirect.startsWith('/') ? req.query.redirect : '/projects',
+  });
+  const params = new URLSearchParams({
+    client_id: process.env.GITHUB_CLIENT_ID,
+    redirect_uri: GITHUB_CALLBACK_URL,
+    scope: 'read:user user:email',
+    state,
+  });
+  res.redirect(`https://github.com/login/oauth/authorize?${params}`);
+});
+
+app.get('/auth/github/callback', async (req, res) => {
+  const { code, state, error } = req.query;
+  const stateData = typeof state === 'string' ? consumeTemporaryValue(githubOAuthStates, state) : null;
+
+  if (error || !code || !stateData) {
+    return res.redirect(`${FRONTEND_URL}/projects?github_error=${encodeURIComponent(error || 'Invalid GitHub authorization request')}`);
+  }
+
+  try {
+    const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
+      method: 'POST',
+      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: process.env.GITHUB_CLIENT_ID,
+        client_secret: process.env.GITHUB_CLIENT_SECRET,
+        code,
+        redirect_uri: GITHUB_CALLBACK_URL,
+      }),
+    });
+    const tokenBody = await tokenResponse.json();
+    if (!tokenResponse.ok || !tokenBody.access_token) {
+      throw new Error('GitHub token exchange failed');
+    }
+
+    const githubHeaders = {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${tokenBody.access_token}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    const profileResponse = await fetch('https://api.github.com/user', { headers: githubHeaders });
+    const profile = await profileResponse.json();
+    if (!profileResponse.ok || !profile.id || !profile.login) {
+      throw new Error('GitHub profile lookup failed');
+    }
+
+    const emailsResponse = await fetch('https://api.github.com/user/emails', { headers: githubHeaders });
+    const emails = await emailsResponse.json();
+    const primaryEmail = Array.isArray(emails)
+      ? emails.find((item) => item.primary && item.verified)?.email
+      : null;
+    const email = String(primaryEmail || profile.email || `${profile.login}@users.noreply.github.com`).toLowerCase();
+
+    let user = await User.findOne({ githubId: String(profile.id) });
+    if (!user) user = await User.findOne({ email });
+    if (user) {
+      user.githubId = String(profile.id);
+      user.githubLogin = profile.login;
+      if (!user.email) user.email = email;
+      await user.save();
+    } else {
+      user = await User.create({ email, githubId: String(profile.id), githubLogin: profile.login });
+    }
+
+    const authCode = createTemporaryValue(githubAuthCodes, generateToken(user));
+    res.redirect(`${FRONTEND_URL}${stateData.redirect}?github_code=${encodeURIComponent(authCode)}`);
+  } catch (err) {
+    console.error('GitHub authentication error:', err);
+    res.redirect(`${FRONTEND_URL}/projects?github_error=GitHub%20authentication%20failed`);
+  }
+});
+
+router.post('/auth/github/exchange', (req, res) => {
+  const token = consumeTemporaryValue(githubAuthCodes, req.body?.code);
+  if (!token) return res.status(401).json({ error: 'GitHub authorization code is invalid or expired' });
+  res.json({ token });
+});
+
 router.post('/register', async (req, res, next) => {
   try {
     const { email, password } = req.body || {};
@@ -157,7 +259,7 @@ router.post('/login', async (req, res, next) => {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
 
-    const isMatch = await bcrypt.compare(String(password), user.password);
+    const isMatch = user.password ? await bcrypt.compare(String(password), user.password) : false;
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }

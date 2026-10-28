@@ -82,7 +82,21 @@ Create a `.env` file in the project root:
 ```
 MONGODB_URI=mongodb://localhost:27017/student-portfolio
 PORT=5000
+FRONTEND_URL=http://localhost:5173
+GITHUB_CLIENT_ID=your-github-oauth-client-id
+GITHUB_CLIENT_SECRET=your-github-oauth-client-secret
+GITHUB_CALLBACK_URL=http://localhost:5000/auth/github/callback
 ```
+
+### GitHub Login
+
+GitHub login uses OAuth and never sends a GitHub password to this application.
+Create an OAuth App in GitHub **Settings -> Developer settings -> OAuth Apps**,
+set its authorization callback URL to
+`http://localhost:5000/auth/github/callback`, and add the client ID and secret
+to `.env`. Restart the backend after changing environment variables. The
+frontend's **Continue with GitHub** button then redirects to GitHub for
+authorization and links the verified GitHub email to the local user record.
 
 ## Setup
 

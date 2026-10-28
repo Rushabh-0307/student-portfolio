@@ -1,7 +1,7 @@
 function ErrorMessage({ message }) {
   return (
     <p className="error-message" role="alert">
-      Unable to load repositories: {message}
+      {message}
     </p>
   )
 }

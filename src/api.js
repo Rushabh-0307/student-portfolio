@@ -1,5 +1,21 @@
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const TOKEN_KEY = 'student_portfolio_token';
+const API_URL = BASE_URL;
+
+export function getGitHubLoginUrl() {
+  return `${API_URL}/auth/github?redirect=/projects`;
+}
+
+export async function exchangeGitHubCode(code) {
+  const res = await fetch(`${API_URL}/auth/github/exchange`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  const body = await handleResponse(res);
+  setAuthToken(body.token);
+  return body;
+}
 
 export function getAuthToken() {
   if (typeof window === 'undefined') return null;
