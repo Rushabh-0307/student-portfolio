@@ -212,7 +212,7 @@ function Projects() {
   if (!token) {
     return (
       <section className="portfolio-section auth-section">
-        <div className="welcome-text">Welcome, I am Rushabh.</div>
+        <div className="welcome-text"></div>
         <h2>Authentication</h2>
         <Toasts toasts={toasts} removeToast={removeToast} />
         {authError && <ErrorMessage message={authError} />}
