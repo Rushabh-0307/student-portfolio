@@ -1,4 +1,8 @@
 import express from 'express';
+import https from 'node:https';
+import fs from 'node:fs';
+import path from 'node:path';
+import mongoSanitize from 'express-mongo-sanitize';
 import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
@@ -9,6 +13,7 @@ import { getCacheStats, getCachedValue, invalidateCache, setCachedValue } from '
 import taskEvents from './events.js';
 import { Task } from './models/Task.js';
 import { User } from './models/User.js';
+import { protect } from './middleware/auth.js';
 import './listeners.js';
 
 dotenv.config();
@@ -22,6 +27,8 @@ const githubAuthCodes = new Map();
 
 app.use(cors());
 app.use(express.json());
+// Prevent NoSQL query operator injection (A2)
+app.use(mongoSanitize());
 
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url} - ${new Date().toISOString()}`);
@@ -29,18 +36,26 @@ app.use((req, res, next) => {
 });
 
 app.use((req, res, next) => {
-  if ((req.method === 'POST' || req.method === 'PUT') && req.headers['content-type'] !== 'application/json') {
-    return res.status(400).json({ error: 'Content-Type must be application/json' });
+  if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+    const contentType = req.headers['content-type'] || '';
+    if (!contentType.includes('application/json')) {
+      return res.status(400).json({ error: 'Content-Type must be application/json' });
+    }
   }
   next();
 });
 
 async function connectDB() {
+  const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
+  if (!mongoUri) {
+    console.error('MongoDB connection error: Neither MONGO_URI nor MONGODB_URI is set.');
+    process.exit(1);
+  }
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
+    await mongoose.connect(mongoUri);
     console.log('MongoDB connected successfully');
   } catch (err) {
-    console.error('MongoDB connection error:', err);
+    console.error('MongoDB connection error:', err.message);
     process.exit(1);
   }
 }
@@ -70,22 +85,7 @@ function consumeTemporaryValue(store, key) {
   return entry.value;
 }
 
-function protect(req, res, next) {
-  try {
-    const authHeader = req.headers.authorization || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
-
-    if (!token) {
-      return res.status(401).json({ error: 'Authorization token missing' });
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded;
-    next();
-  } catch {
-    return res.status(401).json({ error: 'Invalid or expired token' });
-  }
-}
+// protect middleware imported from ./middleware/auth.js (P7)
 
 function validateTaskPayload(req, res, next) {
   const { title, description, priority, completed } = req.body || {};
@@ -113,14 +113,20 @@ function validateTaskPayload(req, res, next) {
   next();
 }
 
-const ALL_TASKS_CACHE_KEY = 'tasks:all';
+const CACHE_ENABLED = process.env.CACHE_ENABLED !== 'false';
+
+function allTasksCacheKey(userId) {
+  return `tasks:all:${userId || 'global'}`;
+}
 
 function taskCacheKey(taskId) {
   return `tasks:${taskId}`;
 }
 
-function clearTaskCaches(taskId) {
-  invalidateCache([ALL_TASKS_CACHE_KEY, taskCacheKey(taskId)]);
+function clearTaskCaches(taskId, userId) {
+  const keys = [taskCacheKey(taskId), 'tasks:all'];
+  if (userId) keys.push(allTasksCacheKey(userId));
+  invalidateCache(keys);
 }
 
 const router = express.Router();
@@ -254,7 +260,7 @@ router.post('/login', async (req, res, next) => {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ email: normalizedEmail });
+    const user = await User.findOne({ email: normalizedEmail }).select('+password');
     if (!user) {
       return res.status(401).json({ error: 'Invalid email or password' });
     }
@@ -291,14 +297,26 @@ router.use(protect);
 
 router.get('/tasks', async (req, res, next) => {
   try {
-    const cachedTasks = getCachedValue(ALL_TASKS_CACHE_KEY);
-    if (cachedTasks) {
-      res.set('X-Cache', 'HIT');
-      return res.json({ tasks: cachedTasks });
+    const userId = req.user?.id || req.user?._id;
+    const cacheKey = allTasksCacheKey(userId);
+
+    if (CACHE_ENABLED) {
+      const cachedTasks = getCachedValue(cacheKey);
+      if (cachedTasks) {
+        res.set('X-Cache', 'HIT');
+        return res.json({ tasks: cachedTasks });
+      }
     }
 
-    const tasks = await Task.find().lean();
-    setCachedValue(ALL_TASKS_CACHE_KEY, tasks);
+    // Return tasks belonging to this user, plus existing tasks with no owner (P7 multi-user)
+    const filter = userId
+      ? { $or: [{ user: userId }, { user: { $exists: false } }, { user: null }] }
+      : {};
+    const tasks = await Task.find(filter).sort({ createdAt: -1 }).lean();
+
+    if (CACHE_ENABLED) {
+      setCachedValue(cacheKey, tasks);
+    }
     res.set('X-Cache', 'MISS');
     res.json({ tasks });
   } catch (err) {
@@ -306,18 +324,22 @@ router.get('/tasks', async (req, res, next) => {
   }
 });
 
-router.get('/task/:id', validateId, async (req, res, next) => {
+router.get(['/tasks/:id', '/task/:id'], validateId, async (req, res, next) => {
   try {
     const cacheKey = taskCacheKey(req.taskId);
-    const cachedTask = getCachedValue(cacheKey);
-    if (cachedTask) {
-      res.set('X-Cache', 'HIT');
-      return res.json({ task: cachedTask });
+    if (CACHE_ENABLED) {
+      const cachedTask = getCachedValue(cacheKey);
+      if (cachedTask) {
+        res.set('X-Cache', 'HIT');
+        return res.json({ task: cachedTask });
+      }
     }
 
     const task = await Task.findById(req.taskId).lean();
     if (!task) return res.status(404).json({ error: 'Task not found' });
-    setCachedValue(cacheKey, task);
+    if (CACHE_ENABLED) {
+      setCachedValue(cacheKey, task);
+    }
     res.set('X-Cache', 'MISS');
     res.json({ task });
   } catch (err) {
@@ -332,9 +354,10 @@ router.post('/tasks', validateTaskPayload, async (req, res, next) => {
       title: String(title).trim(),
       description: description ? String(description).trim() : '',
       priority: priority || 'medium',
+      user: req.user?.id || req.user?._id, // Link task to authenticated user (P7)
     });
     await task.save();
-    clearTaskCaches(task._id.toString());
+    clearTaskCaches(task._id.toString(), req.user?.id);
     res.status(201).json({ task });
     console.log(`[API] Response sent at ${new Date().toISOString()} for task "${task.title}"`);
     taskEvents.emit('task-created', {
@@ -352,17 +375,20 @@ router.post('/tasks', validateTaskPayload, async (req, res, next) => {
 
 router.put('/tasks/:id', validateId, validateTaskPayload, async (req, res, next) => {
   try {
-    const task = await Task.findById(req.taskId);
-    if (!task) return res.status(404).json({ error: 'Task not found' });
     const { title, description, completed, priority } = req.body;
+    const updateData = {};
+    if (title !== undefined) updateData.title = String(title).trim();
+    if (description !== undefined) updateData.description = String(description).trim();
+    if (completed !== undefined) updateData.completed = Boolean(completed);
+    if (priority !== undefined) updateData.priority = priority;
 
-    if (title !== undefined) task.title = String(title).trim();
-    if (description !== undefined) task.description = String(description).trim();
-    if (completed !== undefined) task.completed = Boolean(completed);
-    if (priority !== undefined) task.priority = priority;
+    const task = await Task.findByIdAndUpdate(req.taskId, updateData, {
+      new: true,
+      runValidators: true,
+    });
+    if (!task) return res.status(404).json({ error: 'Task not found' });
 
-    await task.save();
-    clearTaskCaches(task._id.toString());
+    clearTaskCaches(task._id.toString(), req.user?.id);
     res.json({ task });
   } catch (err) {
     if (err.name === 'ValidationError') {
@@ -373,7 +399,7 @@ router.put('/tasks/:id', validateId, validateTaskPayload, async (req, res, next)
   }
 });
 
-router.get('/cache-stats', (_req, res) => {
+router.get(['/cache-stats', '/debug/cache-stats'], (_req, res) => {
   res.json(getCacheStats());
 });
 
@@ -381,7 +407,7 @@ router.delete('/tasks/:id', validateId, async (req, res, next) => {
   try {
     const task = await Task.findByIdAndDelete(req.taskId);
     if (!task) return res.status(404).json({ error: 'Task not found' });
-    clearTaskCaches(req.taskId);
+    clearTaskCaches(req.taskId, req.user?.id);
     res.json({ deleted: task });
     console.log(`[API] Response sent at ${new Date().toISOString()} for deleted task "${task.title}"`);
     taskEvents.emit('task-deleted', {
@@ -399,13 +425,52 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not Found' });
 });
 
+// Global error handler as the LAST middleware (P4, P5)
+// Converts Mongoose ValidationError into structured JSON (400) and prevents stack trace leakage
 app.use((err, req, res, _next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Something went wrong' });
+  console.error('[ServerError]', err.stack || err.message);
+
+  if (err.name === 'ValidationError') {
+    const details = Object.keys(err.errors || {}).map((field) => ({
+      field,
+      message: err.errors[field].message,
+    }));
+    return res.status(400).json({
+      error: 'Validation failed',
+      details,
+    });
+  }
+
+  if (err.name === 'CastError') {
+    return res.status(400).json({ error: `Invalid ${err.path}: ${err.value}` });
+  }
+
+  res.status(err.status || 500).json({ error: 'Something went wrong' });
 });
 
 const PORT = process.env.PORT || 5000;
 
 connectDB().then(() => {
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+  // Optional HTTPS server on port 5443 (A2)
+  const HTTPS_PORT = process.env.HTTPS_PORT || 5443;
+  const certPath = path.resolve('localhost.pem');
+  const keyPath = path.resolve('localhost-key.pem');
+
+  if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+    try {
+      const httpsOptions = {
+        key: fs.readFileSync(keyPath),
+        cert: fs.readFileSync(certPath),
+      };
+      https.createServer(httpsOptions, app).listen(HTTPS_PORT, () => {
+        console.log(`Optional HTTPS server running on port ${HTTPS_PORT}`);
+      });
+    } catch (httpsErr) {
+      console.warn(`[HTTPS] Failed to bind HTTPS server: ${httpsErr.message}`);
+    }
+  } else {
+    // Certs not present; HTTP server continues uninterrupted
+  }
 });

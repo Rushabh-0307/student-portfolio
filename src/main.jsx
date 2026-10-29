@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+// BrowserRouter wraps the entire app to enable client-side routing (P2)
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'

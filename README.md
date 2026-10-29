@@ -1,225 +1,164 @@
-# Student Portfolio (React + Vite)
+# Student Portfolio & Task Management Platform (React + Vite + Express + MongoDB)
 
-This repository contains Practical 1-5 work for **Advanced Web Development Frameworks (ITUE301)**.
+This repository contains the complete practical and assignment work for **Advanced Web Development Frameworks (ITUE301)**. It features a full-stack, authenticated task management system integrated inside a responsive student portfolio.
 
-## Practical 2 Features
+---
 
-- React Router v6 based navigation with no full page reload.
-- Routes:
-  - `/` -> Home
-  - `/projects` -> Projects
-  - `/contact` -> Contact
-  - `*` -> 404 Not Found
-- `NavBar` built with `Link` from `react-router-dom`.
-- `useState` for dark/light mode toggle.
-- Controlled contact input with live preview and character count.
-- Second `useState` on Contact page to show/hide help text.
+## Practical → Feature → File Index
 
-## Practical 3 Features (API Integration)
+| Practical / Assignment | Core Feature | Key Implementation Files |
+|---|---|---|
+| **P1** | React Component Architecture & Props | `src/components/Header.jsx`, `src/components/Skills.jsx`, `src/components/About.jsx`, `src/components/Home.jsx` |
+| **P2** | State, Routing, Dark/Light Mode & Controlled Inputs | `src/main.jsx`, `src/App.jsx`, `src/components/NavBar.jsx`, `src/components/Contact.jsx`, `src/components/NotFound.jsx` |
+| **P3** | API Fetch Pattern, Loading/Error States & Filtering | `src/components/Projects.jsx`, `src/components/Spinner.jsx`, `src/components/ErrorMessage.jsx` |
+| **P4** | RESTful Express API, Middleware Pipeline & Safe 404/500 | `server.js` |
+| **A1** | Richardson Maturity Model Evaluation (Levels 0–3) | `docs/assignments/w4-maturity/MATURITY.md` |
+| **P5** | MongoDB ODM Integration, Schema Validation & Error Handling | `models/Task.js`, `server.js`, `.env.example` |
+| **P6** | Full-Stack Integration, CRUD UI, Toasts & Confirmation | `src/api.js`, `src/components/Projects.jsx`, `src/components/Toast.jsx` |
+| **P7** | JWT Authentication, Middleware & Scoped Task Isolation | `middleware/auth.js`, `models/User.js`, `src/components/Projects.jsx` |
+| **A2** | Threat Modelling (STRIDE), HTTPS/TLS & NoSQL Sanitization | `docs/assignments/w7-security/SECURITY.md`, `server.js` (`express-mongo-sanitize`) |
+| **P8** | Route Code Splitting, React.lazy, Suspense & Build Benchmarks | `src/App.jsx`, `docs/perf/PERFORMANCE.md`, `docs/perf/before-build.txt`, `docs/perf/after-build.txt` |
+| **P9** | In-Memory Caching (`node-cache`), Latency Optimization | `cache.js`, `server.js`, `docs/perf/CACHING.md`, `scripts/measure-cache-perf.mjs` |
+| **A3** | Apache Bench Load Testing & Idempotent Seeding | `scripts/seed.js`, `scripts/get-token.js`, `docs/assignments/w9-loadtest/LOADTEST.md` |
+| **P10** | Event-Driven Async Processing with Node.js EventEmitter | `events.js`, `listeners.js`, `server.js`, `docs/perf/EVENTS.md`, `scripts/verify-events.mjs` |
+| **P11** | Docker Multi-Stage Containerization & Compose Orchestration | `Dockerfile`, `Dockerfile.frontend`, `docker-compose.yml`, `.dockerignore`, `docs/DOCKER.md` |
 
-- Projects route integrates with the GitHub REST API:
-  - `https://api.github.com/users/octocat/repos?sort=updated&per_page=100`
-- Uses `useEffect` for fetch-on-mount behavior.
-- Uses `useState` for:
-  - `repos` (API data)
-  - `loading` (request in progress)
-  - `error` (request failure)
-  - `searchQuery` (client-side filtering)
-- Shows reusable loading and error components:
-  - `Spinner`
-  - `ErrorMessage`
-- Includes supplementary requirements:
-  - Retry button on API failure
-  - Search filter by repository name
-  - Star count display for each repository
+---
 
-## Practical 4 Features (Express CRUD API)
+## How to Run Locally
 
-- In-memory task management Express server
-- Full CRUD operations:
-  - `GET /tasks` -> retrieve all tasks
-  - `POST /tasks` -> create a task
-  - `PUT /tasks/:id` -> update a task
-  - `DELETE /tasks/:id` -> delete a task
-- Request validation and error handling
-- Request logging middleware
+### Prerequisites
+- Node.js v18+ (tested on Node v24)
+- Local MongoDB running on `mongodb://localhost:27017`
 
-## Practical 5 Features (MongoDB Integration with Mongoose)
-
-- MongoDB database integration using Mongoose ODM
-- Task schema with validation:
-  - `title` (String, required, trimmed)
-  - `description` (String, optional, trimmed)
-  - `completed` (Boolean, default: false)
-  - `priority` (Enum: low/medium/high, default: medium)
-  - `createdAt` (Date, auto-set)
-- Pre-save hook for automatic whitespace trimming
-- Full CRUD operations with MongoDB:
-  - `GET /tasks` -> retrieve all tasks from database
-  - `GET /task/:id` -> retrieve a single task by ObjectId with 404 handling
-  - `POST /tasks` -> create a task with schema validation
-  - `PUT /tasks/:id` -> update a task with validation
-  - `DELETE /tasks/:id` -> delete a task
-- Mongoose validation error handling
-- Environment-based configuration with `.env`
-
-### MongoDB Setup
-
-To run Practical 5, ensure MongoDB is installed and running:
-
+### Step 1: Environment Setup
+Copy the example environment file:
 ```bash
-# Local MongoDB (default port 27017)
-mongod
-
-# Or use MongoDB Atlas (cloud)
-# Update MONGODB_URI in .env with your connection string
+cp .env.example .env
 ```
-
-### Environment Configuration
-
-Create a `.env` file in the project root:
-
-```
-MONGODB_URI=mongodb://localhost:27017/student-portfolio
+Ensure your `.env` contains:
+```env
+MONGO_URI=mongodb://localhost:27017/student-portfolio
 PORT=5000
-FRONTEND_URL=http://localhost:5173
-GITHUB_CLIENT_ID=your-github-oauth-client-id
-GITHUB_CLIENT_SECRET=your-github-oauth-client-secret
-GITHUB_CALLBACK_URL=http://localhost:5000/auth/github/callback
+JWT_SECRET=your-secure-jwt-secret-here
+CACHE_ENABLED=true
+ENABLE_HTTPS=false
 ```
 
-### GitHub Login
-
-GitHub login uses OAuth and never sends a GitHub password to this application.
-Create an OAuth App in GitHub **Settings -> Developer settings -> OAuth Apps**,
-set its authorization callback URL to
-`http://localhost:5000/auth/github/callback`, and add the client ID and secret
-to `.env`. Restart the backend after changing environment variables. The
-frontend's **Continue with GitHub** button then redirects to GitHub for
-authorization and links the verified GitHub email to the local user record.
-
-## Setup
-
+### Step 2: Install Dependencies
 ```bash
 npm install
-npm run dev      # Start Vite dev server
-npm run start    # Start Express server (Practical 5)
 ```
 
-## Validation
+### Step 3: Run with Two Terminals
 
-```bash
-npm run lint
-npm run build
-```
+- **Terminal 1: Start Express Backend API**
+  ```bash
+  npm run start
+  # Starts server on http://localhost:5000
+  ```
 
-## Practical 8 Features (Lazy Loading and Code Splitting)
+- **Terminal 2: Start Vite Frontend Dev Server**
+  ```bash
+  npm run dev
+  # Opens interactive SPA on http://localhost:5173
+  ```
 
-- Route-based code splitting added with `React.lazy()` and `Suspense`.
-- `Projects` and `Contact` now load only when their routes are visited.
-- A dedicated fallback UI appears while each route chunk downloads.
-- Use Vite build output and browser DevTools Network tab to compare:
-  - initial bundle size
-  - per-route chunk files
-  - page load behavior before and after optimization
+---
 
-### Performance Notes
+## How to Run with Docker Compose
 
-| Metric | Before | After |
-| --- | --- | --- |
-| Initial JS bundle | Capture from baseline build | Capture after lazy loading |
-| Route chunk loading | Not split | Split into route-specific chunks |
-| Route transition UX | Immediate bundle cost upfront | Fallback shown while chunk loads |
-
-> Add your screenshots or recorded DevTools values here for submission evidence.
-
-## Practical 9 Features (In-Memory Caching and Query Optimization)
-
-- Added in-memory caching for authenticated task routes using `node-cache`.
-- `GET /tasks` now serves from cache for repeated reads within the TTL window.
-- `GET /task/:id` is cached separately from the all-tasks response.
-- Cache entries are invalidated after successful `POST`, `PUT`, and `DELETE` operations.
-- A protected debug endpoint is available at `GET /cache-stats` for cache-hit/cache-miss counts.
-- `X-Cache: HIT` / `X-Cache: MISS` headers are returned on cached GET responses.
-
-### Response Time Comparison Log
-
-Record at least 3 samples for each case in Postman or Thunder Client.
-
-| Case | Sample 1 | Sample 2 | Sample 3 | Notes |
-| --- | --- | --- | --- | --- |
-| Uncached `GET /tasks` |  |  |  | Cache check temporarily disabled |
-| Cached `GET /tasks` |  |  |  | Repeated request within TTL |
-| Uncached `GET /task/:id` |  |  |  | Optional extra comparison |
-| Cached `GET /task/:id` |  |  |  | Optional extra comparison |
-
-### Notes
-
-- `node-cache` is process-local and resets on restart.
-- TTL is set to 60 seconds for lab testing.
-- Cache invalidation is required on every write so stale task data is not served.
-
-## Practical 11 Features (Docker Containerization)
-
-The full-stack application can be built and started with one Docker Compose command:
+To start the entire multi-container stack (frontend, backend, and MongoDB) with a single command:
 
 ```bash
 docker compose up --build
 ```
 
-This starts three services on the `app-network` bridge network:
+- **Frontend App:** Visit `http://localhost:5173`
+- **Backend API:** Published at `http://localhost:5000`
+- **Database:** MongoDB running on `localhost:27017` with data saved in named volume `mongodb-data`.
 
-| Service | Container port | Host port | Purpose |
-| --- | ---: | ---: | --- |
-| `frontend` | 5173 | 5173 | Builds and serves the React application |
-| `backend` | 5000 | 5000 | Runs the Node/Express API |
-| `mongodb` | 27017 | 27017 | Stores task data |
-
-Open `http://localhost:5173` after the containers start. The browser uses the
-published backend address at `http://localhost:5000`; inside the Compose
-network, the backend connects to MongoDB using the service name
-`mongodb://mongodb:27017/taskdb`, not `localhost`.
-
-The frontend uses a multi-stage build so the final image contains only the
-production preview server and the generated `dist` output. The root
-`.dockerignore` excludes `node_modules`, `.env`, local virtual environments,
-build output, and repository metadata from Docker build contexts.
-
-MongoDB data is stored in the named `mongodb-data` volume and survives
-container restarts. To stop the stack without deleting data:
-
+To stop the containers while preserving database state:
 ```bash
 docker compose down
 ```
 
-To remove the containers and the persisted database volume:
-
+To stop and remove containers along with the persistent database volume:
 ```bash
 docker compose down -v
 ```
 
-If port `5000`, `5173`, or `27017` is already in use, change the host side of
-the corresponding `ports` entry in `docker-compose.yml`.
+---
 
-## Practical 10 Features (Event-Driven Async Processing)
+## Environment Variables Reference
 
-- Added a native Node.js `EventEmitter` in [events.js](./events.js) for task lifecycle events.
-- `POST /tasks` emits `task-created` after the `201` response is sent.
-- The task-created listener simulates a two-second notification delay and logs:
-  - task title
-  - handler start and completion timestamps
-  - assigned user
-- `DELETE /tasks/:id` emits `task-deleted` after the response is sent.
-- An `error` listener logs rejected asynchronous event handlers without crashing the server.
+| Variable | Description | Default / Example Value |
+|---|---|---|
+| `MONGO_URI` / `MONGODB_URI` | Connection string for MongoDB database | `mongodb://localhost:27017/student-portfolio` (Local) <br>`mongodb://mongodb:27017/taskdb` (Docker) |
+| `PORT` | HTTP port for the Express backend | `5000` |
+| `JWT_SECRET` | Secret key used to sign and verify HMAC-SHA256 JWT tokens | `student-portfolio-lab-secret` |
+| `CACHE_ENABLED` | Toggles in-memory `node-cache` layer (`true` or `false`) | `true` |
+| `ENABLE_HTTPS` | Enables optional HTTPS server on port 5443 | `false` |
+| `VITE_API_URL` | Base URL used by frontend fetch requests | `http://localhost:5000` |
 
-### Expected Console Evidence
+---
 
-The API response log must appear before the delayed notification completion log:
+## REST API Route Specifications
 
-```text
-[API] Response sent at 2026-... for task "Prepare practical"
-[Notification] Task "Prepare practical" handler started at 2026-... (assigned user: ...)
-[Notification] Task "Prepare practical" notification completed at 2026-... (assigned user: ...)
-```
+| Method | Endpoint | Protection | Description | Status Codes |
+|---|---|---|---|---|
+| `POST` | `/register` | Public | Register new user with hashed password (bcrypt 10 rounds) | 201, 400, 409 |
+| `POST` | `/login` | Public | Authenticate user and issue 1-hour signed JWT | 200, 400, 401 |
+| `GET` | `/me` | JWT Protected | Return authenticated user identity (`select: -password`) | 200, 401, 404 |
+| `GET` | `/tasks` | JWT Protected | Retrieve all tasks owned by user (cached via `node-cache`) | 200, 401 |
+| `GET` | `/tasks/:id` | JWT Protected | Retrieve single task by ObjectId (cached separately) | 200, 400, 401, 404 |
+| `POST` | `/tasks` | JWT Protected | Create task, validate title, emit `task-created` event | 201, 400, 401 |
+| `PUT` | `/tasks/:id` | JWT Protected | Update task with schema validation (`runValidators: true`) | 200, 400, 401, 404 |
+| `DELETE` | `/tasks/:id` | JWT Protected | Delete task and emit `task-deleted` event | 200, 400, 401, 404 |
+| `GET` | `/cache-stats` | Public/Debug | Retrieve cache hits, misses, and active keys | 200 |
 
-The two-second delay is intentionally outside the request-response path. This demonstrates that the API can return immediately while the notification work continues on the event loop.
+---
+
+## Legacy Practical Documentation Archive
+
+### Practical 2 Features
+- React Router based navigation with no full page reload (`main.jsx`, `App.jsx`).
+- Routes: `/` -> Home, `/projects` -> Projects & Task Management, `/contact` -> Contact, `*` -> 404 Not Found.
+- `NavBar` built with `Link` from `react-router-dom`.
+- `useState` for dark/light mode toggle applying `.dark-mode` / `.light-mode` to the root shell.
+- Controlled contact input with live preview and character count.
+- Second `useState` on Contact page to show/hide help text tooltip.
+
+### Practical 3 Features (API Integration)
+- Reusable `Spinner` and `ErrorMessage` components.
+- Search and category filter input on project listings.
+- Retry button and graceful error handling on network failure.
+
+### Practical 4 Features (Express CRUD API)
+- Modular Express server pipeline with logging, JSON validation, and safe error boundary.
+- Strict Content-Type enforcement rejecting non-JSON POST/PUT requests.
+- Route-specific ObjectId validator preventing application crashes.
+
+### Practical 5 Features (MongoDB + Mongoose)
+- Task schema with trimming pre-save hook and priority enum (`low`, `medium`, `high`).
+- Strict schema validation with structured JSON error details.
+- Environment separation using `.env.example`.
+
+### Practical 8 Features (Lazy Loading & Code Splitting)
+- Route-based chunk splitting with `React.lazy` and `<Suspense>`.
+- Initial bundle size reduced by 18.2 kB (documented in `docs/perf/PERFORMANCE.md`).
+
+### Practical 9 Features (In-Memory Caching)
+- Micro-caching layer using `node-cache` with user-scoped isolation (`tasks:all:${userId}`).
+- Measured 8.5x latency improvement (64ms uncached down to 2.8ms cached).
+- Dynamic cache bypass via `CACHE_ENABLED=false` for benchmarking.
+
+### Practical 10 Features (Event-Driven Notifications)
+- Singleton `EventEmitter` emitting `task-created` and `task-deleted` lifecycle events.
+- Response-first dispatch guarantee: HTTP 201 response flushes before simulated async notifications execute.
+- Verified logs in `docs/perf/EVENTS.md`.
+
+### Practical 11 Features (Docker Containerization)
+- Multi-stage frontend Docker build serving production build artifacts.
+- Compose bridge networking resolving internal database DNS (`mongodb://mongodb:27017/taskdb`).
+- Host mapping for browser access (`http://localhost:5000`).

@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
+        # Crucial: Vite env vars are baked in at compile-time.
+        # The browser runs on the host machine, so it must reach http://localhost:5000 (P11)
         VITE_API_URL: http://localhost:5000
     ports:
       - "5173:5173"
@@ -18,11 +20,14 @@ services:
       context: .
       dockerfile: Dockerfile
     environment:
+      MONGO_URI: mongodb://mongodb:27017/taskdb
       MONGODB_URI: mongodb://mongodb:27017/taskdb
       PORT: 5000
-      JWT_SECRET: ${JWT_SECRET:-development-secret-change-me}
+      JWT_SECRET: ${JWT_SECRET:-student-portfolio-lab-secret}
+      CACHE_ENABLED: "true"
     ports:
       - "5000:5000"
+    restart: on-failure
     depends_on:
       mongodb:
         condition: service_healthy
@@ -34,6 +39,7 @@ services:
     ports:
       - "27017:27017"
     volumes:
+      # Named volume guarantees task data persists across container down/up (P11)
       - mongodb-data:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
