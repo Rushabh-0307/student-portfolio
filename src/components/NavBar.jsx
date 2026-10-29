@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 
-// NavBar with smooth scroll on home page and direct link routing (P2)
+// NavBar with single Contact button and smooth scrolling (P2)
 function NavBar({ darkMode, setDarkMode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
   const location = useLocation()
-  const navigate = useNavigate()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -16,11 +15,11 @@ function NavBar({ darkMode, setDarkMode }) {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
+  // Primary desktop navigation links (duplicate Contact removed)
   const navLinks = [
     { id: 'home', to: '/', label: 'Home' },
     { id: 'portfolio', to: '/projects', label: 'Portfolio' },
     { id: 'tasks', to: '/tasks', label: 'Task Management' },
-    { id: 'contact', to: '/contact', label: 'Contact' },
   ]
 
   const handleNavClick = (e, link) => {
@@ -33,10 +32,10 @@ function NavBar({ darkMode, setDarkMode }) {
         return
       }
     }
-    // If not on home or element not found, standard Link handles navigation to link.to
   }
 
   const handleCtaClick = (e) => {
+    setIsMenuOpen(false)
     if (location.pathname === '/') {
       const el = document.getElementById('contact')
       if (el) {
@@ -62,7 +61,18 @@ function NavBar({ darkMode, setDarkMode }) {
               </Link>
             </li>
           ))}
+          {/* Mobile-only menu item when hamburger is open */}
+          <li className="mobile-only-nav-item">
+            <Link
+              to="/contact"
+              className="nav-link"
+              onClick={handleCtaClick}
+            >
+              Contact
+            </Link>
+          </li>
         </ul>
+
         {/* Dark/light mode toggle button (P2) */}
         <button
           type="button"
@@ -72,7 +82,11 @@ function NavBar({ darkMode, setDarkMode }) {
         >
           {darkMode ? '☀️' : '🌙'}
         </button>
+
+        {/* Single primary Contact Me button on the right */}
         <Link to="/contact" className="nav-cta" onClick={handleCtaClick}>Contact Me</Link>
+
+        {/* Hamburger for mobile */}
         <button
           type="button"
           className={`hamburger ${isMenuOpen ? 'active' : ''}`}

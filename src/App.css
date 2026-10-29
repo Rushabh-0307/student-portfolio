@@ -1258,3 +1258,14 @@
     height: 180px;
   }
 }
+
+
+.mobile-only-nav-item {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-only-nav-item {
+    display: block;
+  }
+}
