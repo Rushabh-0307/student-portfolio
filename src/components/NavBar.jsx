@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 
-// NavBar uses <Link> for internal navigation — no full page reloads (P2)
+// NavBar with smooth scroll on home page and direct link routing (P2)
 function NavBar({ darkMode, setDarkMode }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isScrolled, setIsScrolled] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
 
   useEffect(() => {
     const handleScroll = () => {
@@ -14,12 +16,35 @@ function NavBar({ darkMode, setDarkMode }) {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Internal navigation links use react-router-dom <Link> (P2)
   const navLinks = [
-    { to: '/', label: 'Home' },
-    { to: '/projects', label: 'Portfolio' },
-    { to: '/contact', label: 'Contact' },
+    { id: 'home', to: '/', label: 'Home' },
+    { id: 'portfolio', to: '/projects', label: 'Portfolio' },
+    { id: 'tasks', to: '/tasks', label: 'Task Management' },
+    { id: 'contact', to: '/contact', label: 'Contact' },
   ]
+
+  const handleNavClick = (e, link) => {
+    setIsMenuOpen(false)
+    if (location.pathname === '/') {
+      const el = document.getElementById(link.id)
+      if (el) {
+        e.preventDefault()
+        el.scrollIntoView({ behavior: 'smooth' })
+        return
+      }
+    }
+    // If not on home or element not found, standard Link handles navigation to link.to
+  }
+
+  const handleCtaClick = (e) => {
+    if (location.pathname === '/') {
+      const el = document.getElementById('contact')
+      if (el) {
+        e.preventDefault()
+        el.scrollIntoView({ behavior: 'smooth' })
+      }
+    }
+  }
 
   return (
     <nav className={`navbar ${isScrolled ? 'scrolled' : ''}`}>
@@ -27,18 +52,18 @@ function NavBar({ darkMode, setDarkMode }) {
         <Link to="/" className="nav-logo">RUSHABH</Link>
         <ul className={`nav-list ${isMenuOpen ? 'active' : ''}`}>
           {navLinks.map((link) => (
-            <li key={link.to}>
+            <li key={link.id}>
               <Link
                 to={link.to}
                 className="nav-link"
-                onClick={() => setIsMenuOpen(false)}
+                onClick={(e) => handleNavClick(e, link)}
               >
                 {link.label}
               </Link>
             </li>
           ))}
         </ul>
-        {/* Dark/light mode toggle button (P2 assignment) */}
+        {/* Dark/light mode toggle button (P2) */}
         <button
           type="button"
           className="theme-toggle-btn"
@@ -47,7 +72,7 @@ function NavBar({ darkMode, setDarkMode }) {
         >
           {darkMode ? '☀️' : '🌙'}
         </button>
-        <Link to="/contact" className="nav-cta">Contact Me</Link>
+        <Link to="/contact" className="nav-cta" onClick={handleCtaClick}>Contact Me</Link>
         <button
           type="button"
           className={`hamburger ${isMenuOpen ? 'active' : ''}`}

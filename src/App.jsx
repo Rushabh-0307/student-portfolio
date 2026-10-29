@@ -1,18 +1,14 @@
-import { useState, lazy, Suspense } from 'react'
+import { useState } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import NavBar from './components/NavBar.jsx'
 import Header from './components/Header.jsx'
 import Home from './components/Home.jsx'
+import Projects from './components/Projects.jsx'
+import TaskManagement from './components/TaskManagement.jsx'
+import Contact from './components/Contact.jsx'
+import NotFound from './components/NotFound.jsx'
 import Footer from './components/Footer.jsx'
-import Spinner from './components/Spinner.jsx'
 import './App.css'
-
-// Route-based code splitting with React.lazy (P8)
-// Projects and Contact are loaded on-demand when the route is visited
-const Projects = lazy(() => import('./components/Projects.jsx'))
-const Contact = lazy(() => import('./components/Contact.jsx'))
-// Assignment: lazy-load one additional component (NotFound)
-const NotFound = lazy(() => import('./components/NotFound.jsx'))
 
 function App() {
   // Dark/light mode state (P2)
@@ -21,15 +17,22 @@ function App() {
   return (
     <div className={`app-shell ${darkMode ? 'dark-mode' : 'light-mode'}`}>
       <NavBar darkMode={darkMode} setDarkMode={setDarkMode} />
-      {/* ONE Suspense fallback wrapped around Routes block only (P8) */}
-      <Suspense fallback={<Spinner text="Loading page components..." />}>
-        <Routes>
-          <Route path="/" element={<><Header name="Rushabh" /><Home /></>} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Suspense>
+      <Routes>
+        {/* Full Single-Page Portfolio: Header -> About -> Skills -> Portfolio -> Task Management -> Contact */}
+        <Route path="/" element={<><Header name="Rushabh" /><Home /></>} />
+
+        {/* Dedicated direct route for Portfolio / Projects */}
+        <Route path="/projects" element={<div style={{ paddingTop: '5rem' }}><Projects /></div>} />
+
+        {/* Dedicated direct route for Task Management */}
+        <Route path="/tasks" element={<div style={{ paddingTop: '5rem' }}><TaskManagement /></div>} />
+
+        {/* Dedicated direct route for Contact */}
+        <Route path="/contact" element={<div style={{ paddingTop: '5rem' }}><Contact /></div>} />
+
+        {/* 404 Route */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
       <Footer />
     </div>
   )

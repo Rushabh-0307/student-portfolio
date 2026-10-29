@@ -1,6 +1,8 @@
 import About from './About.jsx'
 import Skills from './Skills.jsx'
-import { Link } from 'react-router-dom'
+import Projects from './Projects.jsx'
+import TaskManagement from './TaskManagement.jsx'
+import Contact from './Contact.jsx'
 
 // Default skill list passed as prop to Skills to satisfy P1 props requirement
 const defaultSkills = [
@@ -17,21 +19,24 @@ const defaultSkills = [
 function Home() {
   return (
     <div className="main-content">
-      {/* Reusing About component to prevent duplicated JSX (P1) */}
+      {/* 1. About section */}
       <About />
+
+      {/* 2. Skills section */}
       <section className="about-section" style={{ paddingTop: 0 }}>
         <div className="container">
           <Skills skillList={defaultSkills} />
-          <div style={{ textAlign: 'center', marginTop: '2.5rem' }}>
-            <Link to="/projects" className="btn btn-primary" style={{ marginRight: '1rem' }}>
-              Explore Projects & Tasks
-            </Link>
-            <Link to="/contact" className="btn btn-outline">
-              Get In Touch
-            </Link>
-          </div>
         </div>
       </section>
+
+      {/* 3. Original Portfolio / Projects showcase */}
+      <Projects />
+
+      {/* 4. Dedicated Task Management section located between Portfolio and Contact */}
+      <TaskManagement />
+
+      {/* 5. Contact section */}
+      <Contact />
     </div>
   )
 }
