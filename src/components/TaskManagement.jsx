@@ -21,6 +21,8 @@ export default function TaskManagement() {
   const [newTask, setNewTask] = useState({ title: '', description: '', priority: 'medium' })
   const [editingTask, setEditingTask] = useState(null) // task object when editing
   const [deleteConfirmId, setDeleteConfirmId] = useState(null) // task ID when confirming delete
+  const [aiGenerating, setAiGenerating] = useState(false) // P13: AI loading state
+  const [aiDisclaimer, setAiDisclaimer] = useState(false) // P13: show AI disclaimer
 
   // Filter and search
   const [priorityFilter, setPriorityFilter] = useState('all')
@@ -192,6 +194,30 @@ export default function TaskManagement() {
     }
   }
 
+  // P13 – AI-powered description generation
+  const handleGenerateDescription = async () => {
+    if (!newTask.title.trim()) {
+      addToast('Enter a task title first to generate a description', 'error')
+      return
+    }
+    setAiGenerating(true)
+    setAiDisclaimer(false)
+    try {
+      const data = await api.generateDescription(newTask.title.trim())
+      if (data.fallback) {
+        addToast(data.message || 'AI service unavailable. Please try again later.', 'error')
+      } else if (data.description) {
+        setNewTask((t) => ({ ...t, description: data.description }))
+        setAiDisclaimer(true)
+        addToast('AI description generated! You can edit it before saving.', 'info')
+      }
+    } catch (err) {
+      addToast(`AI generation failed: ${err.message}`, 'error')
+    } finally {
+      setAiGenerating(false)
+    }
+  }
+
   // Filtered task list
   const filteredTasks = tasks.filter((task) => {
     const matchesSearch =
@@ -330,8 +356,46 @@ export default function TaskManagement() {
                   style={{ minHeight: '80px' }}
                   placeholder="Description (optional)"
                   value={newTask.description}
-                  onChange={(e) => setNewTask((t) => ({ ...t, description: e.target.value }))}
+                  onChange={(e) => {
+                    setNewTask((t) => ({ ...t, description: e.target.value }))
+                    if (aiDisclaimer) setAiDisclaimer(false)
+                  }}
                 />
+                {/* P13 – Generate Description Button with loading state */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8rem', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                    onClick={handleGenerateDescription}
+                    disabled={aiGenerating || !newTask.title.trim()}
+                  >
+                    {aiGenerating ? '⏳ Generating...' : '✨ Generate Description'}
+                  </button>
+                  {aiGenerating && (
+                    <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      Waiting for AI response...
+                    </span>
+                  )}
+                </div>
+                {/* P13 – AI Disclaimer */}
+                {aiDisclaimer && (
+                  <div
+                    style={{
+                      background: '#fbbf2420',
+                      border: '1px solid #fbbf2460',
+                      borderRadius: '8px',
+                      padding: '0.6rem 1rem',
+                      fontSize: '0.82rem',
+                      color: '#fbbf24',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                    }}
+                  >
+                    ⚠️ This description was AI-generated and should be reviewed before saving.
+                  </div>
+                )}
                 <button
                   type="submit"
                   className="btn btn-primary"

@@ -15,6 +15,7 @@ import { Task } from './models/Task.js';
 import { User } from './models/User.js';
 import { protect } from './middleware/auth.js';
 import './listeners.js';
+import aiRouter from './routes/ai.js';
 
 dotenv.config();
 
@@ -418,6 +419,9 @@ router.delete('/tasks/:id', validateId, async (req, res, next) => {
     next(err);
   }
 });
+
+// P13 – AI API Integration (behind auth middleware via router)
+app.use('/api/ai', protect, aiRouter);
 
 app.use('/', router);
 

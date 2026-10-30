@@ -59,4 +59,22 @@ describe('Express Server – Smoke Tests', () => {
     // so it returns 401 for unauthenticated requests
     expect([200, 401]).toContain(res.statusCode);
   });
+
+  // ---- P13: AI Generate Description Endpoint ----
+
+  test('POST /api/ai/generate-description returns 401 (unauthenticated)', async () => {
+    const res = await request(app)
+      .post('/api/ai/generate-description')
+      .send({ title: 'Test task' });
+    expect(res.statusCode).toBe(401);
+  });
+
+  test('POST /api/ai/generate-description requires JSON Content-Type', async () => {
+    const res = await request(app)
+      .post('/api/ai/generate-description')
+      .set('Content-Type', 'text/plain')
+      .send('not json');
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toContain('Content-Type');
+  });
 });

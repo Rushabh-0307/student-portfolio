@@ -131,4 +131,14 @@ export async function deleteTask(id) {
   return true;
 }
 
-export default { getTasks, createTask, updateTask, deleteTask, loginUser, registerUser, getCurrentUser, clearAuthToken };
+// P13 – AI-powered description generation (calls backend, never exposes API key)
+export async function generateDescription(title) {
+  const res = await fetch(`${BASE_URL}/api/ai/generate-description`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ title }),
+  });
+  return handleResponse(res);
+}
+
+export default { getTasks, createTask, updateTask, deleteTask, loginUser, registerUser, getCurrentUser, clearAuthToken, generateDescription };
