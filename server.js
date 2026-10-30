@@ -448,29 +448,35 @@ app.use((err, req, res, _next) => {
   res.status(err.status || 500).json({ error: 'Something went wrong' });
 });
 
+// Export app for testing (P12 CI/CD)
+export { app, connectDB };
+
 const PORT = process.env.PORT || 5000;
 
-connectDB().then(() => {
-  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Only start the server when this file is run directly, not when imported by tests
+if (process.env.NODE_ENV !== 'test') {
+  connectDB().then(() => {
+    app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-  // Optional HTTPS server on port 5443 (A2)
-  const HTTPS_PORT = process.env.HTTPS_PORT || 5443;
-  const certPath = path.resolve('localhost.pem');
-  const keyPath = path.resolve('localhost-key.pem');
+    // Optional HTTPS server on port 5443 (A2)
+    const HTTPS_PORT = process.env.HTTPS_PORT || 5443;
+    const certPath = path.resolve('localhost.pem');
+    const keyPath = path.resolve('localhost-key.pem');
 
-  if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
-    try {
-      const httpsOptions = {
-        key: fs.readFileSync(keyPath),
-        cert: fs.readFileSync(certPath),
-      };
-      https.createServer(httpsOptions, app).listen(HTTPS_PORT, () => {
-        console.log(`Optional HTTPS server running on port ${HTTPS_PORT}`);
-      });
-    } catch (httpsErr) {
-      console.warn(`[HTTPS] Failed to bind HTTPS server: ${httpsErr.message}`);
+    if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+      try {
+        const httpsOptions = {
+          key: fs.readFileSync(keyPath),
+          cert: fs.readFileSync(certPath),
+        };
+        https.createServer(httpsOptions, app).listen(HTTPS_PORT, () => {
+          console.log(`Optional HTTPS server running on port ${HTTPS_PORT}`);
+        });
+      } catch (httpsErr) {
+        console.warn(`[HTTPS] Failed to bind HTTPS server: ${httpsErr.message}`);
+      }
+    } else {
+      // Certs not present; HTTP server continues uninterrupted
     }
-  } else {
-    // Certs not present; HTTP server continues uninterrupted
-  }
-});
+  });
+}

@@ -1,5 +1,7 @@
 # Student Portfolio & Task Management Platform (React + Vite + Express + MongoDB)
 
+![CI Pipeline](https://github.com/Rushabh-0307/student-portfolio/actions/workflows/ci.yml/badge.svg)
+
 This repository contains the complete practical and assignment work for **Advanced Web Development Frameworks (ITUE301)**. It features a full-stack, authenticated task management system integrated inside a responsive student portfolio.
 
 ---
@@ -22,6 +24,7 @@ This repository contains the complete practical and assignment work for **Advanc
 | **A3** | Apache Bench Load Testing & Idempotent Seeding | `scripts/seed.js`, `scripts/get-token.js`, `docs/assignments/w9-loadtest/LOADTEST.md` |
 | **P10** | Event-Driven Async Processing with Node.js EventEmitter | `events.js`, `listeners.js`, `server.js`, `docs/perf/EVENTS.md`, `scripts/verify-events.mjs` |
 | **P11** | Docker Multi-Stage Containerization & Compose Orchestration | `Dockerfile`, `Dockerfile.frontend`, `docker-compose.yml`, `.dockerignore`, `docs/DOCKER.md` |
+| **P12** | CI/CD Pipeline with GitHub Actions | `.github/workflows/ci.yml`, `__tests__/server.test.js`, `jest.config.js` |
 
 ---
 
@@ -162,3 +165,10 @@ docker compose down -v
 - Multi-stage frontend Docker build serving production build artifacts.
 - Compose bridge networking resolving internal database DNS (`mongodb://mongodb:27017/taskdb`).
 - Host mapping for browser access (`http://localhost:5000`).
+
+
+### Practical 12 Features (CI/CD Pipeline with GitHub Actions)
+- GitHub Actions workflow (`.github/workflows/ci.yml`) triggers on every push and PR to `main`.
+- Jest + Supertest test suite (`__tests__/server.test.js`) validates API routes, middleware, and auth.
+- Pipeline installs dependencies, runs automated tests, and reports pass/fail status.
+- CI status badge displayed at the top of this README.
